@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { type Settings, loadSettings, saveSettings } from './lib/db';
 import { dayKey } from './lib/util';
 import { DepthCtx, NavCtx, SettingsCtx, useNav, type Nav } from './ui/ctx';
+import { ErrorBoundary } from './ui/ErrorBoundary';
 import { Icon, Sheet } from './ui/kit';
 import { Onboarding } from './screens/Onboarding';
 import { Today } from './screens/Today';
@@ -53,7 +54,9 @@ export function App() {
   if (!ctx) return <div className="app" />;
   return (
     <SettingsCtx.Provider value={ctx}>
-      <div className="app">{ctx.settings.onboarded ? <Shell /> : <Onboarding />}</div>
+      <div className="app">
+        <ErrorBoundary>{ctx.settings.onboarded ? <Shell /> : <Onboarding />}</ErrorBoundary>
+      </div>
     </SettingsCtx.Provider>
   );
 }
@@ -127,10 +130,12 @@ function Shell() {
   return (
     <NavCtx.Provider value={nav}>
       <main className="tab-view" key={tab} {...covered}>
-        {tab === 'today' && <Today today={today} openDiary={openDiary} />}
-        {tab === 'diary' && <Diary date={date} setDate={setDate} today={today} />}
-        {tab === 'progress' && <Progress today={today} />}
-        {tab === 'more' && <More />}
+        <ErrorBoundary>
+          {tab === 'today' && <Today today={today} openDiary={openDiary} />}
+          {tab === 'diary' && <Diary date={date} setDate={setDate} today={today} />}
+          {tab === 'progress' && <Progress today={today} />}
+          {tab === 'more' && <More />}
+        </ErrorBoundary>
       </main>
 
       <nav className="tabbar" aria-label="Sections" {...covered}>
@@ -142,7 +147,9 @@ function Shell() {
       </nav>
 
       {stack.map((s, i) => (
-        <DepthCtx.Provider key={s.id} value={i + 1}>{s.node}</DepthCtx.Provider>
+        <DepthCtx.Provider key={s.id} value={i + 1}>
+          <ErrorBoundary variant="page" onClose={() => nav.pop()}>{s.node}</ErrorBoundary>
+        </DepthCtx.Provider>
       ))}
       {toast && <div className="toast" key={toast.id} role="status">{toast.text}</div>}
     </NavCtx.Provider>
