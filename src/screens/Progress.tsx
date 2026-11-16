@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useState } from 'react';
-import { db, entryNutrients, goalForDate } from '../lib/db';
+import { bodyHistory, db, entryNutrients, goalForDate } from '../lib/db';
 import { NUTRIENTS, add, fmt, kcal, macroSplit, scale, type Nutrients } from '../lib/nutrition';
 import { addDays, daysBetween, lastDays, shortDate, toDisplayWeight, weightText } from '../lib/util';
 import { useNav, useSettings } from '../ui/ctx';
@@ -142,7 +142,7 @@ export function Progress({ today }: { today: string }) {
 function WeightHistory() {
   const { settings } = useSettings();
   const nav = useNav();
-  const rows = useLiveQuery(() => db.body.orderBy('date').reverse().toArray(), []) ?? [];
+  const rows = useLiveQuery(async () => (await bodyHistory()).reverse(), []) ?? [];
   const inches = settings.units.height === 'ftin';
   return (
     <Page title="Weight history">

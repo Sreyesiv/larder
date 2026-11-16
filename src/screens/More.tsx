@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useRef, useState, type ReactNode } from 'react';
-import { DEFAULT_NUTRIENT_GOALS, db, eraseAll, exportAll, exportDiaryCsv, importAll, totals, type Goals } from '../lib/db';
+import { DEFAULT_NUTRIENT_GOALS, db, eraseAll, exportAll, exportDiaryCsv, importAll, loggedDayCount, totals, type Goals } from '../lib/db';
 import { ACTIVITY_LEVELS, NUTRIENT_BY_KEY, calorieTarget, caloriesFromMacros, gramsFromPercent, kcal, percentFromGrams, type DayGoal, type NutrientKey, type Profile } from '../lib/nutrition';
 import { ML_PER_FLOZ, WEEKDAYS, dayKey, parseNum, type Units } from '../lib/util';
 import { useNav, useSettings } from '../ui/ctx';
@@ -358,7 +358,7 @@ function DataPage() {
   const nav = useNav();
   const file = useRef<HTMLInputElement>(null);
   const [error, setError] = useState('');
-  const counts = useLiveQuery(async () => ({ entries: await db.entries.count(), foods: await db.foods.count(), days: (await db.entries.orderBy('date').uniqueKeys()).length }), []);
+  const counts = useLiveQuery(async () => ({ entries: await db.entries.count(), foods: await db.foods.count(), days: await loggedDayCount() }), []);
 
   const restore = async (f: File | undefined) => {
     if (!f) return;

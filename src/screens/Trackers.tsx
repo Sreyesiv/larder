@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
-import { db, type ExerciseEntry } from '../lib/db';
+import { db, latestWeight, type ExerciseEntry } from '../lib/db';
 import { ACTIVITIES, estimateBurn } from '../lib/exercise';
 import { uid } from '../lib/nutrition';
 import { ML_PER_FLOZ, dayLabel, fromDisplayWeight, parseNum, toDisplayWeight, waterText } from '../lib/util';
@@ -43,7 +43,7 @@ export function WaterSheet({ date }: { date: string }) {
 export function ExerciseSheet({ date, entry }: { date: string; entry?: ExerciseEntry }) {
   const nav = useNav();
   const { settings } = useSettings();
-  const latest = useLiveQuery(async () => (await db.body.orderBy('date').reverse().toArray()).find((b) => b.weightKg !== undefined)?.weightKg, []);
+  const latest = useLiveQuery(async () => (await latestWeight())?.weightKg, []);
   const weightKg = latest ?? settings.profile.weightKg;
   const known = entry ? ACTIVITIES.findIndex((a) => a.name === entry.name) : 0;
   const [idx, setIdx] = useState(known);
@@ -133,7 +133,7 @@ export function WeightSheet({ date }: { date: string }) {
     const wa = parseNum(waist);
     await db.body.put({ date, weightKg, bodyFatPct: f > 0 && f < 80 ? f : undefined, waistCm: wa > 0 ? (inches ? wa * 2.54 : wa) : undefined });
     // The newest weigh-in also feeds the calorie estimate for exercise and goals.
-    const newest = (await db.body.orderBy('date').reverse().toArray()).find((b) => b.weightKg !== undefined);
+    const newest = await latestWeight();
     if (newest?.date === date) update((s) => ({ ...s, profile: { ...s.profile, weightKg } }));
     nav.toast('Weight logged');
     nav.pop();

@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, loggingStreak, totals } from '../lib/db';
+import { bodyHistory, loggingStreak, totals } from '../lib/db';
 import { fmt, kcal } from '../lib/nutrition';
 import { ML_PER_FLOZ, parseDay, waterText, weightText } from '../lib/util';
 import { useNav, useSettings } from '../ui/ctx';
@@ -15,7 +15,7 @@ export function Today({ today, openDiary }: { today: string; openDiary: (date: s
   const nav = useNav();
   const day = useDay(today);
   const streak = useLiveQuery(() => loggingStreak(today), [today, day.entries.length]) ?? 0;
-  const weights = useLiveQuery(async () => (await db.body.orderBy('date').reverse().limit(60).toArray()).filter((b) => b.weightKg !== undefined).slice(0, 30).reverse(), []) ?? [];
+  const weights = useLiveQuery(async () => (await bodyHistory()).filter((b) => b.weightKg !== undefined).slice(-30), []) ?? [];
 
   // Small phones get a smaller ring so the goal/food/exercise column keeps its room.
   const narrow = typeof window !== 'undefined' && window.innerWidth < 370;

@@ -136,6 +136,12 @@ export function goalForDate(goals: Goals, date: string): DayGoal {
 }
 
 // ---------- Diary ----------
+//
+// Reads in this app avoid IndexedDB cursors. iPhone Safari (seen on iOS 17.5) can refuse them with
+// "UnknownError: Unable to open cursor", while bulk reads keep working. Dexie reads in bulk for a
+// plain key or range in ascending order, and falls back to a cursor for reverse(), filter(),
+// anyOf(), uniqueKeys() and keys(). So: read ascending, then sort, filter or slice in memory.
+// tests/no-cursors.test.ts and the browser tests fail if a cursor is opened.
 
 export async function logPortion(p: Portion, date: string, meal: number): Promise<string> {
   const id = uid();
@@ -155,7 +161,7 @@ export async function rememberFood(food: Food): Promise<void> {
 
 export async function findByBarcode(barcode: string): Promise<Food | undefined> {
   const variants = new Set([barcode, barcode.replace(/^0+/, ''), barcode.padStart(13, '0'), barcode.padStart(12, '0')]);
-  const hits = await db.foods.where('barcode').anyOf([...variants]).toArray();
+  const hits = (await Promise.all([...variants].map((v) => db.foods.where('barcode').equals(v).toArray()))).flat();
   // Prefer the user's own entry over a cached database copy.
   return hits.sort((a, b) => Number(b.source === 'custom' || !!b.edited) - Number(a.source === 'custom' || !!a.edited))[0];
 }
@@ -173,9 +179,12 @@ export async function copyEntries(entries: Entry[], date: string, meal?: number)
   await db.entries.bulkAdd(entries.map((e, i) => ({ ...e, id: uid(), date, meal: meal ?? e.meal, createdAt: now + i })));
 }
 
-/** Distinct foods from the diary, most recent first, each with the portion last used. */
-export async function recentPortions(limit = 30): Promise<Portion[]> {
-  const rows = await db.entries.orderBy('createdAt').reverse().limit(400).toArray();
+/** Distinct foods from the last few months of the diary, most recent first, each with the portion last used. */
+export async function recentPortions(limit = 30, today = dayKey()): Promise<Portion[]> {
+  const from = new Date(parseDay(today));
+  from.setDate(from.getDate() - 120);
+  const rows = await db.entries.where('date').between(dayKey(from), '9999-12-31', true, true).toArray();
+  rows.sort((x, y) => y.createdAt - x.createdAt);
   const seen = new Set<string>();
   const out: Portion[] = [];
   for (const e of rows) {
@@ -189,15 +198,31 @@ export async function recentPortions(limit = 30): Promise<Portion[]> {
 
 /** Consecutive days up to today (or yesterday) that have at least one food logged. */
 export async function loggingStreak(today = dayKey()): Promise<number> {
-  const days = new Set((await db.entries.orderBy('date').uniqueKeys()) as string[]);
-  let d = parseDay(today);
-  if (!days.has(dayKey(d))) d.setDate(d.getDate() - 1);
+  const logged = async (d: Date) => (await db.entries.where('date').equals(dayKey(d)).count()) > 0;
+  const d = parseDay(today);
+  if (!(await logged(d))) d.setDate(d.getDate() - 1);
   let n = 0;
-  while (days.has(dayKey(d))) {
+  while (n < 3650 && (await logged(d))) {
     n++;
     d.setDate(d.getDate() - 1);
   }
   return n;
+}
+
+/** Every weigh-in and measurement, oldest first. */
+export function bodyHistory(): Promise<BodyDay[]> {
+  return db.body.toArray();
+}
+
+/** The most recent logged weight, if any. */
+export async function latestWeight(): Promise<BodyDay | undefined> {
+  const rows = (await bodyHistory()).filter((b) => b.weightKg !== undefined);
+  return rows[rows.length - 1];
+}
+
+/** Number of distinct days that have food logged. */
+export async function loggedDayCount(): Promise<number> {
+  return new Set((await db.entries.toArray()).map((e) => e.date)).size;
 }
 
 // ---------- Backup ----------
