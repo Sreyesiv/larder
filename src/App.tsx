@@ -16,9 +16,12 @@ type Tab = 'today' | 'diary' | 'progress' | 'more';
 
 export function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [storageError, setStorageError] = useState(false);
 
   useEffect(() => {
-    loadSettings().then(setSettings);
+    // Some browsers refuse on-device storage (certain private modes and in-app browsers).
+    // Say so plainly instead of leaving a blank screen.
+    loadSettings().then(setSettings).catch(() => setStorageError(true));
   }, []);
 
   const update = useCallback((fn: (s: Settings) => Settings) => {
@@ -37,6 +40,16 @@ export function App() {
   }, [settings?.theme]);
 
   const ctx = useMemo(() => (settings ? { settings, update } : null), [settings, update]);
+  if (storageError) {
+    return (
+      <div className="app">
+        <div className="onb">
+          <h1>Larder can’t save data in this browser</h1>
+          <p className="lede">This usually means private browsing is on, or the page was opened inside another app. Open it in Safari or Chrome in a normal tab and try again.</p>
+        </div>
+      </div>
+    );
+  }
   if (!ctx) return <div className="app" />;
   return (
     <SettingsCtx.Provider value={ctx}>
